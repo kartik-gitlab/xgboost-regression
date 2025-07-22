@@ -59,10 +59,23 @@ def predict(input_path=None, df=None, model_dir="/opt/ml/model", output_path=Non
     regression_target = "NewPayUp"
     classification_target = "NewPayUp_missing"
     exclude_cols = [regression_target, classification_target]
-    numeric_cols = [c for c in df.select_dtypes(include=["float64", "int64"]).columns
-                    if c not in exclude_cols]
-    logger.info(f"Numeric columns used in X: {numeric_cols}")
+    # Align input features with those used during training
+    numeric_cols = trained_feature_cols
+    missing_feats = [c for c in numeric_cols if c not in df.columns]
+    if missing_feats:
+        logger.warning(
+            f"Input data missing expected feature columns: {missing_feats}. "
+            "Filling with zeros.")
+        for c in missing_feats:
+            df[c] = 0.0
+
+    extra_feats = [c for c in df.select_dtypes(include=["float64", "int64"]).columns
+                   if c not in numeric_cols + exclude_cols]
+    if extra_feats:
+        logger.info(f"Ignoring extra feature columns not seen in training: {extra_feats}")
+
     X = df[numeric_cols]
+    logger.info(f"Numeric columns used in X: {numeric_cols}")
 
     # CLASSIFY WHETHER PayUp IS MISSING
     missing_pred = clf.predict(X)
